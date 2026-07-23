@@ -7,8 +7,6 @@ import com.sheahorn.gauge.domain.Tasklist;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.util.Optional;
-
 /**
  * Checks whether the current API key is allowed to access a given project
  * (or entity that belongs to a project tree).
@@ -19,29 +17,34 @@ public class ProjectAccessGuard {
     @Inject
     CurrentApiKey currentApiKey;
 
+    // ── Project ──────────────────────────────────────────────────
+
     /**
-     * Returns true if the current API key is allowed to access the given project.
+     * Returns true if the current API key is allowed to read the given project.
      * Unrestricted keys (including master) can access everything.
-     * Restricted keys can only access projects whose root ancestor is in their
-     * restricted set.
+     * Restricted keys can only access the restricted project and its descendants.
      */
     public boolean canAccessProject(String projectId) {
         ApiKey key = currentApiKey.get();
-        if (key == null) {
-            // No API key set (session auth) — allow
+        if (key == null || !key.isRestricted()) {
             return true;
         }
-        if (!key.isRestricted()) {
-            return true;
-        }
-        // Find the root ancestor of this project
-        String rootId = findRootProjectId(projectId);
-        return key.restrictedProjectIds.contains(rootId);
+        return isProjectUnder(projectId, key.restrictedProjectId);
     }
 
     /**
-     * Returns true if the current API key is allowed to access the given issue.
+     * Returns true if the current API key is allowed to write the given project.
      */
+    public boolean canWriteProject(String projectId) {
+        ApiKey key = currentApiKey.get();
+        if (key == null || !key.isRestricted()) {
+            return true;
+        }
+        return key.canWrite() && isProjectUnder(projectId, key.restrictedProjectId);
+    }
+
+    // ── Issue ────────────────────────────────────────────────────
+
     public boolean canAccessIssue(String issueId) {
         ApiKey key = currentApiKey.get();
         if (key == null || !key.isRestricted()) {
@@ -51,12 +54,26 @@ public class ProjectAccessGuard {
         if (issue == null) {
             return false;
         }
-        return canAccessProject(issue.projectId);
+        return isProjectUnder(issue.projectId, key.restrictedProjectId);
     }
 
-    /**
-     * Returns true if the current API key is allowed to access the given tasklist.
-     */
+    public boolean canWriteIssue(String issueId) {
+        ApiKey key = currentApiKey.get();
+        if (key == null || !key.isRestricted()) {
+            return true;
+        }
+        if (!key.canWrite()) {
+            return false;
+        }
+        Issue issue = Issue.findById(issueId);
+        if (issue == null) {
+            return false;
+        }
+        return isProjectUnder(issue.projectId, key.restrictedProjectId);
+    }
+
+    // ── Tasklist ─────────────────────────────────────────────────
+
     public boolean canAccessTasklist(String tasklistId) {
         ApiKey key = currentApiKey.get();
         if (key == null || !key.isRestricted()) {
@@ -69,9 +86,23 @@ public class ProjectAccessGuard {
         return canAccessIssue(tasklist.issueId);
     }
 
-    /**
-     * Returns true if the current API key is allowed to access the given task.
-     */
+    public boolean canWriteTasklist(String tasklistId) {
+        ApiKey key = currentApiKey.get();
+        if (key == null || !key.isRestricted()) {
+            return true;
+        }
+        if (!key.canWrite()) {
+            return false;
+        }
+        Tasklist tasklist = Tasklist.findById(tasklistId);
+        if (tasklist == null) {
+            return false;
+        }
+        return canWriteIssue(tasklist.issueId);
+    }
+
+    // ── Task ─────────────────────────────────────────────────────
+
     public boolean canAccessTask(String taskId) {
         ApiKey key = currentApiKey.get();
         if (key == null || !key.isRestricted()) {
@@ -84,21 +115,45 @@ public class ProjectAccessGuard {
         return canAccessTasklist(task.tasklistId);
     }
 
+    public boolean canWriteTask(String taskId) {
+        ApiKey key = currentApiKey.get();
+        if (key == null || !key.isRestricted()) {
+            return true;
+        }
+        if (!key.canWrite()) {
+            return false;
+        }
+        Task task = Task.findById(taskId);
+        if (task == null) {
+            return false;
+        }
+        return canWriteTasklist(task.tasklistId);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────
+
     /**
-     * Walks up the parent chain to find the root project ID.
+     * Returns true if {@code projectId} is the restricted project or a descendant of it.
+     * Walks up the parent chain from projectId.
      */
-    private String findRootProjectId(String projectId) {
+    private boolean isProjectUnder(String projectId, String restrictedProjectId) {
+        if (projectId.equals(restrictedProjectId)) {
+            return true;
+        }
         String current = projectId;
         while (current != null) {
             Project p = Project.findById(current);
             if (p == null) {
-                return current; // shouldn't happen, but be safe
+                return false;
             }
             if (p.parentId == null) {
-                return p.id;
+                return false;
+            }
+            if (p.parentId.equals(restrictedProjectId)) {
+                return true;
             }
             current = p.parentId;
         }
-        return projectId;
+        return false;
     }
 }

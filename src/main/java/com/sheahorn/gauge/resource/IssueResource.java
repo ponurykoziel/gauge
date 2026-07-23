@@ -59,7 +59,7 @@ public class IssueResource {
     @POST
     @Path("/{issueId}/tasklists")
     public Response createTasklist(@PathParam("issueId") String issueId, CreateTasklistRequest body) {
-        if (!accessGuard.canAccessIssue(issueId)) {
+        if (!accessGuard.canWriteIssue(issueId)) {
             return forbidden();
         }
         Tasklist tasklist = tasklistService.create(issueId, body.title(), body.decomposesTaskId());
@@ -101,7 +101,7 @@ public class IssueResource {
     @PATCH
     @Path("/{issueId}")
     public Response patch(@PathParam("issueId") String issueId, PatchIssueRequest body) {
-        if (!accessGuard.canAccessIssue(issueId)) {
+        if (!accessGuard.canWriteIssue(issueId)) {
             return forbidden();
         }
         return service.patch(issueId, body.title(), body.description())
@@ -116,7 +116,7 @@ public class IssueResource {
     @PATCH
     @Path("/{issueId}/status")
     public Response updateStatus(@PathParam("issueId") String issueId, UpdateIssueStatusRequest body) {
-        if (!accessGuard.canAccessIssue(issueId)) {
+        if (!accessGuard.canWriteIssue(issueId)) {
             return forbidden();
         }
         return service.updateStatus(issueId, body.status())
@@ -131,7 +131,7 @@ public class IssueResource {
     @PATCH
     @Path("/{issueId}/priority")
     public Response updatePriority(@PathParam("issueId") String issueId, UpdateIssuePriorityRequest body) {
-        if (!accessGuard.canAccessIssue(issueId)) {
+        if (!accessGuard.canWriteIssue(issueId)) {
             return forbidden();
         }
         return service.updatePriority(issueId, body.priority())
@@ -146,10 +146,10 @@ public class IssueResource {
     @PATCH
     @Path("/{issueId}/project")
     public Response moveToProject(@PathParam("issueId") String issueId, MoveIssueRequest body) {
-        if (!accessGuard.canAccessIssue(issueId)) {
+        if (!accessGuard.canWriteIssue(issueId)) {
             return forbidden();
         }
-        if (!accessGuard.canAccessProject(body.projectId())) {
+        if (!accessGuard.canWriteProject(body.projectId())) {
             return forbidden();
         }
         return service.moveToProject(issueId, body.projectId())
@@ -164,7 +164,7 @@ public class IssueResource {
     @DELETE
     @Path("/{issueId}")
     public Response delete(@PathParam("issueId") String issueId, @QueryParam("cascade") boolean cascade) {
-        if (!accessGuard.canAccessIssue(issueId)) {
+        if (!accessGuard.canWriteIssue(issueId)) {
             return forbidden();
         }
         if (!cascade && service.hasChildren(issueId)) {

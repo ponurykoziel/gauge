@@ -64,7 +64,7 @@ public class TaskResource {
     @PATCH
     @Path("/{taskId}")
     public Response patch(@PathParam("taskId") String taskId, PatchTaskRequest body) {
-        if (!accessGuard.canAccessTask(taskId)) {
+        if (!accessGuard.canWriteTask(taskId)) {
             return forbidden();
         }
         return service.patch(taskId, body.title(), body.description())
@@ -79,7 +79,7 @@ public class TaskResource {
     @PATCH
     @Path("/{taskId}/status")
     public Response updateStatus(@PathParam("taskId") String taskId, UpdateTaskStatusRequest body) {
-        if (!accessGuard.canAccessTask(taskId)) {
+        if (!accessGuard.canWriteTask(taskId)) {
             return forbidden();
         }
         return service.updateStatus(taskId, body.status())
@@ -94,7 +94,7 @@ public class TaskResource {
     @DELETE
     @Path("/{taskId}")
     public Response delete(@PathParam("taskId") String taskId) {
-        if (!accessGuard.canAccessTask(taskId)) {
+        if (!accessGuard.canWriteTask(taskId)) {
             return forbidden();
         }
         return service.deleteById(taskId)

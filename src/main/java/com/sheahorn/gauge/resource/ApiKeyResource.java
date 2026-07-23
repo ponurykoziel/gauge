@@ -39,8 +39,9 @@ public class ApiKeyResource {
                     var m = new java.util.HashMap<String, Object>();
                     m.put("id", k.id);
                     m.put("name", k.name);
-                    if (k.restrictedProjectIds != null && !k.restrictedProjectIds.isBlank()) {
-                        m.put("restrictedProjectIds", k.restrictedProjectIds);
+                    if (k.restrictedProjectId != null && !k.restrictedProjectId.isBlank()) {
+                        m.put("restrictedProjectId", k.restrictedProjectId);
+                        m.put("accessLevel", k.accessLevel != null ? k.accessLevel : "READ");
                     }
                     return m;
                 })
@@ -58,16 +59,22 @@ public class ApiKeyResource {
         if (name == null || name.isBlank()) {
             name = "API Key";
         }
-        String restrictedProjectIds = (String) body.get("restrictedProjectIds");
-        ApiKeyService.CreateResult result = service.create(userId, name, restrictedProjectIds);
-        var entity = Map.of(
-            "id", result.apiKey.id,
-            "name", result.apiKey.name,
-            "key", result.rawKey
-        );
-        if (restrictedProjectIds != null && !restrictedProjectIds.isBlank()) {
-            entity = new java.util.HashMap<>(entity);
-            entity.put("restrictedProjectIds", restrictedProjectIds);
+        String restrictedProjectId = (String) body.get("restrictedProjectId");
+        String accessLevel = (String) body.get("accessLevel");
+        if (restrictedProjectId != null && restrictedProjectId.isBlank()) {
+            restrictedProjectId = null;
+        }
+        if (accessLevel == null || accessLevel.isBlank()) {
+            accessLevel = "READ";
+        }
+        ApiKeyService.CreateResult result = service.create(userId, name, restrictedProjectId, accessLevel);
+        var entity = new java.util.HashMap<String, Object>();
+        entity.put("id", result.apiKey.id);
+        entity.put("name", result.apiKey.name);
+        entity.put("key", result.rawKey);
+        if (restrictedProjectId != null) {
+            entity.put("restrictedProjectId", restrictedProjectId);
+            entity.put("accessLevel", accessLevel);
         }
         return Response.status(Response.Status.CREATED)
                 .entity(entity)

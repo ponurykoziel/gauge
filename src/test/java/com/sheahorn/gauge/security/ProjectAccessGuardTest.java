@@ -12,8 +12,6 @@ import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
@@ -76,8 +74,8 @@ class ProjectAccessGuardTest {
         return t;
     }
 
-    private void setKey(Set<String> restrictedProjectIds) {
-        currentApiKey.set(new ApiKey("user1", "testuser", "user", restrictedProjectIds));
+    private void setKey(String restrictedProjectId, String accessLevel) {
+        currentApiKey.set(new ApiKey("user1", "testuser", "user", restrictedProjectId, accessLevel));
     }
 
     // ---- canAccessProject ----
@@ -85,7 +83,6 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessProjectNullKey() {
-        // No key set (session auth) — always allowed
         currentApiKey.set(null);
         Project root = createProject("ROOT0001", "Root", null);
         assertTrue(accessGuard.canAccessProject(root.id()));
@@ -94,75 +91,106 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessProjectUnrestrictedKey() {
-        // Unrestricted key (null restrictedProjectIds) — always allowed
-        setKey(null);
+        setKey(null, null);
         Project root = createProject("ROOT0001", "Root", null);
         assertTrue(accessGuard.canAccessProject(root.id()));
     }
 
     @Test
     @Transactional
-    void testCanAccessProjectUnrestrictedKeyEmptySet() {
-        // Unrestricted key (empty set) — always allowed
-        setKey(Set.of());
-        Project root = createProject("ROOT0001", "Root", null);
-        assertTrue(accessGuard.canAccessProject(root.id()));
+    void testCanAccessProjectRestrictedExactMatch() {
+        setKey("PROJ0001", "READ");
+        Project p = createProject("PROJ0001", "Target", null);
+        assertTrue(accessGuard.canAccessProject(p.id()));
     }
 
     @Test
     @Transactional
-    void testCanAccessProjectRestrictedAllowedRoot() {
-        // Restricted key with root in set — allowed
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0001", "Root", null);
-        assertTrue(accessGuard.canAccessProject(root.id()));
+    void testCanAccessProjectRestrictedDisallowed() {
+        setKey("PROJ0001", "READ");
+        Project p = createProject("PROJ0002", "Other", null);
+        assertFalse(accessGuard.canAccessProject(p.id()));
     }
 
     @Test
     @Transactional
-    void testCanAccessProjectRestrictedDisallowedRoot() {
-        // Restricted key with different root — denied
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0002", "Other Root", null);
-        assertFalse(accessGuard.canAccessProject(root.id()));
+    void testCanAccessProjectRestrictedDirectChild() {
+        setKey("PROJ0001", "READ");
+        Project parent = createProject("PROJ0001", "Parent", null);
+        Project child = createProject("CHILD001", "Child", parent.id());
+        assertTrue(accessGuard.canAccessProject(child.id()));
     }
 
     @Test
     @Transactional
-    void testCanAccessProjectRestrictedNestedSubproject() {
-        // Restricted key allows ROOT0001 — subproject under it should be allowed
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0001", "Root", null);
+    void testCanAccessProjectRestrictedGrandchild() {
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
         Project child = createProject("CHILD001", "Child", root.id());
         Project grandchild = createProject("GRAND001", "Grandchild", child.id());
-
-        assertTrue(accessGuard.canAccessProject(child.id()));
         assertTrue(accessGuard.canAccessProject(grandchild.id()));
     }
 
     @Test
     @Transactional
-    void testCanAccessProjectRestrictedNestedSubprojectDisallowed() {
-        // Restricted key allows ROOT0001 — subproject under ROOT0002 should be denied
-        setKey(Set.of("ROOT0001"));
-        Project otherRoot = createProject("ROOT0002", "Other Root", null);
+    void testCanAccessProjectRestrictedChildOfOtherRoot() {
+        setKey("PROJ0001", "READ");
+        Project otherRoot = createProject("PROJ0002", "Other Root", null);
         Project child = createProject("CHILD001", "Child", otherRoot.id());
-
         assertFalse(accessGuard.canAccessProject(child.id()));
     }
 
     @Test
     @Transactional
-    void testCanAccessProjectRestrictedMultipleRoots() {
-        // Restricted key allows ROOT0001 and ROOT0003
-        setKey(Set.of("ROOT0001", "ROOT0003"));
-        Project root1 = createProject("ROOT0001", "Root1", null);
-        Project root2 = createProject("ROOT0002", "Root2", null);
-        Project root3 = createProject("ROOT0003", "Root3", null);
+    void testCanAccessProjectRestrictedSiblingNotAllowed() {
+        // Key restricted to PROJ0001 — a sibling under the same parent is NOT allowed
+        setKey("PROJ0001", "READ");
+        Project parent = createProject("ROOT0001", "Root", null);
+        createProject("PROJ0001", "Target", parent.id());
+        Project sibling = createProject("PROJ0002", "Sibling", parent.id());
+        assertFalse(accessGuard.canAccessProject(sibling.id()));
+    }
 
-        assertTrue(accessGuard.canAccessProject(root1.id()));
-        assertFalse(accessGuard.canAccessProject(root2.id()));
-        assertTrue(accessGuard.canAccessProject(root3.id()));
+    // ---- canWriteProject ----
+
+    @Test
+    @Transactional
+    void testCanWriteProjectNullKey() {
+        currentApiKey.set(null);
+        Project p = createProject("PROJ0001", "P", null);
+        assertTrue(accessGuard.canWriteProject(p.id()));
+    }
+
+    @Test
+    @Transactional
+    void testCanWriteProjectUnrestrictedKey() {
+        setKey(null, null);
+        Project p = createProject("PROJ0001", "P", null);
+        assertTrue(accessGuard.canWriteProject(p.id()));
+    }
+
+    @Test
+    @Transactional
+    void testCanWriteProjectReadKeyDenied() {
+        setKey("PROJ0001", "READ");
+        Project p = createProject("PROJ0001", "P", null);
+        assertFalse(accessGuard.canWriteProject(p.id()));
+    }
+
+    @Test
+    @Transactional
+    void testCanWriteProjectWriteKeyAllowed() {
+        setKey("PROJ0001", "WRITE");
+        Project p = createProject("PROJ0001", "P", null);
+        assertTrue(accessGuard.canWriteProject(p.id()));
+    }
+
+    @Test
+    @Transactional
+    void testCanWriteProjectWriteKeyDisallowedProject() {
+        setKey("PROJ0001", "WRITE");
+        Project p = createProject("PROJ0002", "P", null);
+        assertFalse(accessGuard.canWriteProject(p.id()));
     }
 
     // ---- canAccessIssue ----
@@ -171,16 +199,7 @@ class ProjectAccessGuardTest {
     @Transactional
     void testCanAccessIssueNullKey() {
         currentApiKey.set(null);
-        Project root = createProject("ROOT0001", "Root", null);
-        Issue issue = createIssue("ISS00001", root.id());
-        assertTrue(accessGuard.canAccessIssue(issue.id()));
-    }
-
-    @Test
-    @Transactional
-    void testCanAccessIssueUnrestrictedKey() {
-        setKey(null);
-        Project root = createProject("ROOT0001", "Root", null);
+        Project root = createProject("PROJ0001", "Root", null);
         Issue issue = createIssue("ISS00001", root.id());
         assertTrue(accessGuard.canAccessIssue(issue.id()));
     }
@@ -188,8 +207,8 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessIssueRestrictedAllowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0001", "Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
         Issue issue = createIssue("ISS00001", root.id());
         assertTrue(accessGuard.canAccessIssue(issue.id()));
     }
@@ -197,8 +216,8 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessIssueRestrictedDisallowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0002", "Other Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0002", "Other", null);
         Issue issue = createIssue("ISS00001", root.id());
         assertFalse(accessGuard.canAccessIssue(issue.id()));
     }
@@ -206,8 +225,28 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessIssueNonexistent() {
-        setKey(Set.of("ROOT0001"));
+        setKey("PROJ0001", "READ");
         assertFalse(accessGuard.canAccessIssue("NONEXISTENT"));
+    }
+
+    // ---- canWriteIssue ----
+
+    @Test
+    @Transactional
+    void testCanWriteIssueReadKeyDenied() {
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
+        Issue issue = createIssue("ISS00001", root.id());
+        assertFalse(accessGuard.canWriteIssue(issue.id()));
+    }
+
+    @Test
+    @Transactional
+    void testCanWriteIssueWriteKeyAllowed() {
+        setKey("PROJ0001", "WRITE");
+        Project root = createProject("PROJ0001", "Root", null);
+        Issue issue = createIssue("ISS00001", root.id());
+        assertTrue(accessGuard.canWriteIssue(issue.id()));
     }
 
     // ---- canAccessTasklist ----
@@ -216,17 +255,7 @@ class ProjectAccessGuardTest {
     @Transactional
     void testCanAccessTasklistNullKey() {
         currentApiKey.set(null);
-        Project root = createProject("ROOT0001", "Root", null);
-        Issue issue = createIssue("ISS00001", root.id());
-        Tasklist tl = createTasklist("TL000001", issue.id());
-        assertTrue(accessGuard.canAccessTasklist(tl.id()));
-    }
-
-    @Test
-    @Transactional
-    void testCanAccessTasklistUnrestrictedKey() {
-        setKey(null);
-        Project root = createProject("ROOT0001", "Root", null);
+        Project root = createProject("PROJ0001", "Root", null);
         Issue issue = createIssue("ISS00001", root.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         assertTrue(accessGuard.canAccessTasklist(tl.id()));
@@ -235,8 +264,8 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessTasklistRestrictedAllowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0001", "Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
         Issue issue = createIssue("ISS00001", root.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         assertTrue(accessGuard.canAccessTasklist(tl.id()));
@@ -245,18 +274,33 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessTasklistRestrictedDisallowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0002", "Other Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0002", "Other", null);
         Issue issue = createIssue("ISS00001", root.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         assertFalse(accessGuard.canAccessTasklist(tl.id()));
     }
 
+    // ---- canWriteTasklist ----
+
     @Test
     @Transactional
-    void testCanAccessTasklistNonexistent() {
-        setKey(Set.of("ROOT0001"));
-        assertFalse(accessGuard.canAccessTasklist("NONEXISTENT"));
+    void testCanWriteTasklistReadKeyDenied() {
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
+        Issue issue = createIssue("ISS00001", root.id());
+        Tasklist tl = createTasklist("TL000001", issue.id());
+        assertFalse(accessGuard.canWriteTasklist(tl.id()));
+    }
+
+    @Test
+    @Transactional
+    void testCanWriteTasklistWriteKeyAllowed() {
+        setKey("PROJ0001", "WRITE");
+        Project root = createProject("PROJ0001", "Root", null);
+        Issue issue = createIssue("ISS00001", root.id());
+        Tasklist tl = createTasklist("TL000001", issue.id());
+        assertTrue(accessGuard.canWriteTasklist(tl.id()));
     }
 
     // ---- canAccessTask ----
@@ -265,18 +309,7 @@ class ProjectAccessGuardTest {
     @Transactional
     void testCanAccessTaskNullKey() {
         currentApiKey.set(null);
-        Project root = createProject("ROOT0001", "Root", null);
-        Issue issue = createIssue("ISS00001", root.id());
-        Tasklist tl = createTasklist("TL000001", issue.id());
-        Task t = createTask("T0000001", tl.id());
-        assertTrue(accessGuard.canAccessTask(t.id()));
-    }
-
-    @Test
-    @Transactional
-    void testCanAccessTaskUnrestrictedKey() {
-        setKey(null);
-        Project root = createProject("ROOT0001", "Root", null);
+        Project root = createProject("PROJ0001", "Root", null);
         Issue issue = createIssue("ISS00001", root.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         Task t = createTask("T0000001", tl.id());
@@ -286,8 +319,8 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessTaskRestrictedAllowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0001", "Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
         Issue issue = createIssue("ISS00001", root.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         Task t = createTask("T0000001", tl.id());
@@ -297,46 +330,61 @@ class ProjectAccessGuardTest {
     @Test
     @Transactional
     void testCanAccessTaskRestrictedDisallowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0002", "Other Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0002", "Other", null);
         Issue issue = createIssue("ISS00001", root.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         Task t = createTask("T0000001", tl.id());
         assertFalse(accessGuard.canAccessTask(t.id()));
     }
 
+    // ---- canWriteTask ----
+
     @Test
     @Transactional
-    void testCanAccessTaskNonexistent() {
-        setKey(Set.of("ROOT0001"));
-        assertFalse(accessGuard.canAccessTask("NONEXISTENT"));
+    void testCanWriteTaskReadKeyDenied() {
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
+        Issue issue = createIssue("ISS00001", root.id());
+        Tasklist tl = createTasklist("TL000001", issue.id());
+        Task t = createTask("T0000001", tl.id());
+        assertFalse(accessGuard.canWriteTask(t.id()));
     }
 
-    // ---- deep chain: task → tasklist → issue → subproject → root ----
+    @Test
+    @Transactional
+    void testCanWriteTaskWriteKeyAllowed() {
+        setKey("PROJ0001", "WRITE");
+        Project root = createProject("PROJ0001", "Root", null);
+        Issue issue = createIssue("ISS00001", root.id());
+        Tasklist tl = createTasklist("TL000001", issue.id());
+        Task t = createTask("T0000001", tl.id());
+        assertTrue(accessGuard.canWriteTask(t.id()));
+    }
+
+    // ---- deep chain ----
 
     @Test
     @Transactional
     void testCanAccessTaskDeepChainAllowed() {
-        setKey(Set.of("ROOT0001"));
-        Project root = createProject("ROOT0001", "Root", null);
+        setKey("PROJ0001", "READ");
+        Project root = createProject("PROJ0001", "Root", null);
         Project child = createProject("CHILD001", "Child", root.id());
         Issue issue = createIssue("ISS00001", child.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         Task t = createTask("T0000001", tl.id());
-
         assertTrue(accessGuard.canAccessTask(t.id()));
     }
 
     @Test
     @Transactional
     void testCanAccessTaskDeepChainDisallowed() {
-        setKey(Set.of("ROOT0001"));
-        Project otherRoot = createProject("ROOT0002", "Other Root", null);
+        setKey("PROJ0001", "READ");
+        Project otherRoot = createProject("PROJ0002", "Other Root", null);
         Project child = createProject("CHILD001", "Child", otherRoot.id());
         Issue issue = createIssue("ISS00001", child.id());
         Tasklist tl = createTasklist("TL000001", issue.id());
         Task t = createTask("T0000001", tl.id());
-
         assertFalse(accessGuard.canAccessTask(t.id()));
     }
 }

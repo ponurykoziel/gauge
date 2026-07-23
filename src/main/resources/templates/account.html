@@ -45,9 +45,19 @@
                         <input type="text" id="f-key-name" placeholder="e.g. my laptop" required>
                     </div>
                     <div class="form-group">
-                        <label>Restrict to root projects <span class="muted">(optional — comma-separated project IDs)</span></label>
-                        <input type="text" id="f-key-restrict" placeholder="e.g. 00000073,0000003C">
-                        <div class="muted small" style="margin-top:2px;">Leave empty for unrestricted access. When set, this key can only access the specified root projects and their descendants.</div>
+                        <label>Restrict to project <span class="muted">(optional)</span></label>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="f-key-project" placeholder="Project ID" style="flex:1;">
+                            <button type="button" id="browse-project-btn" class="btn">Browse&hellip;</button>
+                        </div>
+                        <div class="muted small" style="margin-top:2px;">Leave empty for unrestricted access. When set, this key can only access the specified project and its descendants.</div>
+                    </div>
+                    <div class="form-group" id="access-level-group" style="display:none;">
+                        <label>Access Level</label>
+                        <select id="f-key-access">
+                            <option value="READ">Read — view only</option>
+                            <option value="WRITE">Write — full access</option>
+                        </select>
                     </div>
                     <div class="actions">
                         <button id="create-key-btn" class="btn btn-primary">Create Key</button>
@@ -57,6 +67,22 @@
             </div>
             <div id="new-key-reveal" style="display:none;"></div>
             <div id="apikeys-list">Loading&hellip;</div>
+        </div>
+    </div>
+
+    <!-- Project picker modal -->
+    <div id="project-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;width:500px;max-height:70vh;display:flex;flex-direction:column;">
+            <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;">Select Project</h3>
+                <button id="modal-close-btn" class="btn btn-small" style="font-size:16px;line-height:1;">&times;</button>
+            </div>
+            <div id="modal-tree" style="padding:12px 16px;overflow-y:auto;flex:1;">
+                <div class="muted">Loading&hellip;</div>
+            </div>
+            <div style="padding:12px 16px;border-top:1px solid var(--border);">
+                <button id="modal-clear-btn" class="btn btn-small">Clear selection (unrestricted)</button>
+            </div>
         </div>
     </div>
 
@@ -124,12 +150,18 @@
                 container.innerHTML = '<div class="muted">No API keys yet.</div>';
                 return;
             }
-            var html = '<table><thead><tr><th>Name</th><th>Restricted To</th><th></th></tr></thead><tbody>';
+            var html = '<table><thead><tr><th>Name</th><th>Restricted To</th><th>Access</th><th></th></tr></thead><tbody>';
             keys.forEach(function(k) {
-                var restrict = k.restrictedProjectIds ? '<code style="font-size:11px;">' + esc(k.restrictedProjectIds) + '</code>' : '<span class="muted">All projects</span>';
+                var project = k.restrictedProjectId
+                    ? '<code style="font-size:11px;">' + esc(k.restrictedProjectId) + '</code>'
+                    : '<span class="muted">All projects</span>';
+                var level = k.accessLevel
+                    ? '<span class="pill ' + (k.accessLevel === 'WRITE' ? 'pill-doing' : 'pill-todo') + '">' + esc(k.accessLevel) + '</span>'
+                    : '<span class="muted">&mdash;</span>';
                 html += '<tr>'
                     + '<td>' + esc(k.name) + '</td>'
-                    + '<td>' + restrict + '</td>'
+                    + '<td>' + project + '</td>'
+                    + '<td>' + level + '</td>'
                     + '<td><button class="btn btn-small btn-danger" onclick="deleteKey(\'' + esc(k.id) + '\')">Remove</button></td>'
                     + '</tr>';
             });
@@ -152,11 +184,15 @@
         } catch(e) { alert('Request failed'); }
     }
 
+    // ── New key form ──────────────────────────────────────────────
+
     document.getElementById('add-key-btn').addEventListener('click', function() {
         document.getElementById('new-key-form').style.display = 'block';
         document.getElementById('add-key-btn').style.display = 'none';
         document.getElementById('f-key-name').value = '';
-        document.getElementById('f-key-restrict').value = '';
+        document.getElementById('f-key-project').value = '';
+        document.getElementById('f-key-access').value = 'READ';
+        document.getElementById('access-level-group').style.display = 'none';
         document.getElementById('f-key-name').focus();
     });
 
@@ -165,12 +201,22 @@
         document.getElementById('add-key-btn').style.display = '';
     });
 
+    // Show/hide access level when project field changes
+    document.getElementById('f-key-project').addEventListener('input', function() {
+        var hasProject = this.value.trim().length > 0;
+        document.getElementById('access-level-group').style.display = hasProject ? 'flex' : 'none';
+    });
+
     document.getElementById('create-key-btn').addEventListener('click', async function() {
         var name = document.getElementById('f-key-name').value.trim();
         if (!name) { name = 'API Key'; }
-        var restrict = document.getElementById('f-key-restrict').value.trim();
+        var projectId = document.getElementById('f-key-project').value.trim();
+        var accessLevel = document.getElementById('f-key-access').value;
         var body = { name: name };
-        if (restrict) { body.restrictedProjectIds = restrict; }
+        if (projectId) {
+            body.restrictedProjectId = projectId;
+            body.accessLevel = accessLevel;
+        }
         try {
             var res = await fetch('/api/apikeys', {
                 method: 'POST',
@@ -181,8 +227,9 @@
                 var data = await res.json();
                 var reveal = document.getElementById('new-key-reveal');
                 reveal.style.display = 'block';
-                var restrictInfo = data.restrictedProjectIds
-                    ? '<br><span class="muted">Restricted to root projects: </span><code>' + esc(data.restrictedProjectIds) + '</code>'
+                var restrictInfo = data.restrictedProjectId
+                    ? '<br><span class="muted">Restricted to project </span><code>' + esc(data.restrictedProjectId) + '</code>'
+                      + '<br><span class="muted">Access level: </span><span class="pill ' + (data.accessLevel === 'WRITE' ? 'pill-doing' : 'pill-todo') + '">' + esc(data.accessLevel) + '</span>'
                     : '<br><span class="muted">Unrestricted — can access all projects</span>';
                 reveal.innerHTML = '<div class="key-reveal">'
                     + '<strong>New API Key — copy it now, it won\'t be shown again!</strong>'
@@ -198,8 +245,116 @@
         } catch(e) { alert('Request failed'); }
     });
 
-    loadAccount();
-    loadApiKeys();
+    // ── Project picker modal ──────────────────────────────────────
+
+    var modal = document.getElementById('project-modal');
+    var modalTree = document.getElementById('modal-tree');
+    var selectedProjectId = null;
+    var selectedProjectName = null;
+
+    document.getElementById('browse-project-btn').addEventListener('click', function() {
+        selectedProjectId = document.getElementById('f-key-project').value.trim() || null;
+        modal.style.display = 'flex';
+        loadProjectTree();
+    });
+
+    document.getElementById('modal-close-btn').addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+
+    document.getElementById('modal-clear-btn').addEventListener('click', function() {
+        document.getElementById('f-key-project').value = '';
+        document.getElementById('access-level-group').style.display = 'none';
+        modal.style.display = 'none';
+    });
+
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    async function loadProjectTree() {
+        modalTree.innerHTML = '<div class="muted">Loading&hellip;</div>';
+        try {
+            var res = await fetch('/api/projects?parentId=null');
+            var roots = await res.json();
+            if (!roots || roots.length === 0) {
+                modalTree.innerHTML = '<div class="muted">No projects found.</div>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < roots.length; i++) {
+                html += await renderProjectNode(roots[i], 0);
+            }
+            modalTree.innerHTML = html;
+        } catch(e) {
+            modalTree.innerHTML = '<div class="muted">Error loading projects</div>';
+        }
+    }
+
+    async function renderProjectNode(project, depth) {
+        var indent = depth * 20;
+        var isSelected = project.id === selectedProjectId;
+        var style = 'display:flex;align-items:center;padding:6px 8px;margin:2px 0;border-radius:6px;cursor:pointer;'
+            + (isSelected ? 'background:var(--panel-2);border:1px solid var(--accent);' : '')
+            + 'margin-left:' + indent + 'px;';
+        var expandId = 'expand-' + project.id;
+        var childrenId = 'children-' + project.id;
+
+        var html = '<div>';
+        html += '<div style="' + style + '" data-project-id="' + esc(project.id) + '" data-project-name="' + esc(project.name) + '" class="project-node">';
+        html += '<span id="' + expandId + '" style="width:20px;text-align:center;flex-shrink:0;color:var(--muted);cursor:pointer;" data-project-id="' + esc(project.id) + '">&#9654;</span>';
+        html += '<span style="flex:1;margin-left:4px;">' + esc(project.name) + ' <span class="muted small">(' + esc(project.id) + ')</span></span>';
+        html += '</div>';
+        html += '<div id="' + childrenId + '" style="display:none;"></div>';
+        html += '</div>';
+
+        // Defer loading children
+        setTimeout(async function() {
+            var expandEl = document.getElementById(expandId);
+            var childrenEl = document.getElementById(childrenId);
+            if (!expandEl || !childrenEl) return;
+
+            expandEl.addEventListener('click', async function(e) {
+                e.stopPropagation();
+                if (childrenEl.style.display === 'none') {
+                    // Load children
+                    if (childrenEl.dataset.loaded !== 'true') {
+                        childrenEl.innerHTML = '<div class="muted small" style="margin-left:' + (indent + 20) + 'px;">Loading&hellip;</div>';
+                        try {
+                            var cres = await fetch('/api/projects?parentId=' + encodeURIComponent(project.id));
+                            var children = await cres.json();
+                            var childHtml = '';
+                            for (var i = 0; i < children.length; i++) {
+                                childHtml += await renderProjectNode(children[i], depth + 1);
+                            }
+                            childrenEl.innerHTML = childHtml || '<div class="muted small" style="margin-left:' + (indent + 20) + 'px;">No subprojects</div>';
+                            childrenEl.dataset.loaded = 'true';
+                        } catch(e) {
+                            childrenEl.innerHTML = '<div class="muted small" style="margin-left:' + (indent + 20) + 'px;">Error</div>';
+                        }
+                    }
+                    childrenEl.style.display = 'block';
+                    expandEl.textContent = '\u25BC';
+                } else {
+                    childrenEl.style.display = 'none';
+                    expandEl.textContent = '\u25B6';
+                }
+            });
+        }, 0);
+
+        return html;
+    }
+
+    // Click handler for project nodes (delegated)
+    document.getElementById('modal-tree').addEventListener('click', function(e) {
+        var node = e.target.closest('.project-node');
+        if (!node) return;
+        var pid = node.dataset.projectId;
+        var pname = node.dataset.projectName;
+        document.getElementById('f-key-project').value = pid;
+        document.getElementById('access-level-group').style.display = 'flex';
+        modal.style.display = 'none';
+    });
     </script>
 </div>
 </body>

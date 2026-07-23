@@ -26,7 +26,6 @@ class ApiKeyResolverTest {
     @Transactional
     void cleanUp() {
         com.sheahorn.gauge.domain.ApiKey.findAll().stream().forEach(ak -> ak.delete());
-        // Clean up test users except admin
         User.findAll().stream()
             .map(u -> (User) u)
             .filter(u -> !"admin".equals(u.username))
@@ -62,12 +61,10 @@ class ApiKeyResolverTest {
     @Test
     @Transactional
     void testResolveUserApiKey() {
-        // Create a user first
         User user = User.create("testuser", BcryptUtil.bcryptHash("password"), "user");
         user.persist();
 
-        // Create an API key for the user
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Test Key", null);
+        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Test Key", null, null);
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
@@ -88,36 +85,36 @@ class ApiKeyResolverTest {
         User admin = User.create("admin2", BcryptUtil.bcryptHash("password"), "admin");
         admin.persist();
 
-        ApiKeyService.CreateResult result = apiKeyService.create(admin.id, "Admin Key", null);
+        ApiKeyService.CreateResult result = apiKeyService.create(admin.id, "Admin Key", null, null);
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
         assertTrue(resolved.get().isAdmin());
     }
 
-    // ---- restrictedProjectIds parsing ----
+    // ---- restricted project + access level ----
 
     @Test
     @Transactional
-    void testResolveUserKeyWithNullRestrictedProjectIds() {
+    void testResolveUserKeyWithNullRestrictedProject() {
         User user = User.create("testuser2", BcryptUtil.bcryptHash("password"), "user");
         user.persist();
 
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", null);
+        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", null, null);
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
         assertFalse(resolved.get().isRestricted());
-        assertNull(resolved.get().restrictedProjectIds);
+        assertNull(resolved.get().restrictedProjectId);
     }
 
     @Test
     @Transactional
-    void testResolveUserKeyWithBlankRestrictedProjectIds() {
+    void testResolveUserKeyWithBlankRestrictedProject() {
         User user = User.create("testuser3", BcryptUtil.bcryptHash("password"), "user");
         user.persist();
 
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "   ");
+        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "   ", null);
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
@@ -126,79 +123,47 @@ class ApiKeyResolverTest {
 
     @Test
     @Transactional
-    void testResolveUserKeyWithSingleRestrictedProjectId() {
+    void testResolveUserKeyWithRestrictedProjectRead() {
         User user = User.create("testuser4", BcryptUtil.bcryptHash("password"), "user");
         user.persist();
 
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "ROOT0001");
+        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "PROJ0001", "READ");
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
         assertTrue(resolved.get().isRestricted());
-        assertEquals(1, resolved.get().restrictedProjectIds.size());
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0001"));
+        assertEquals("PROJ0001", resolved.get().restrictedProjectId);
+        assertEquals("READ", resolved.get().accessLevel);
+        assertFalse(resolved.get().canWrite());
     }
 
     @Test
     @Transactional
-    void testResolveUserKeyWithMultipleRestrictedProjectIds() {
+    void testResolveUserKeyWithRestrictedProjectWrite() {
         User user = User.create("testuser5", BcryptUtil.bcryptHash("password"), "user");
         user.persist();
 
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "ROOT0001,ROOT0002,ROOT0003");
+        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "PROJ0001", "WRITE");
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
         assertTrue(resolved.get().isRestricted());
-        assertEquals(3, resolved.get().restrictedProjectIds.size());
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0001"));
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0002"));
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0003"));
+        assertEquals("PROJ0001", resolved.get().restrictedProjectId);
+        assertEquals("WRITE", resolved.get().accessLevel);
+        assertTrue(resolved.get().canWrite());
     }
 
     @Test
     @Transactional
-    void testResolveUserKeyWithWhitespaceInRestrictedProjectIds() {
+    void testResolveUserKeyWithRestrictedProjectDefaultAccessLevel() {
         User user = User.create("testuser6", BcryptUtil.bcryptHash("password"), "user");
         user.persist();
 
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", " ROOT0001 ,  ROOT0002  ,ROOT0003 ");
+        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "PROJ0001", null);
 
         Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
         assertTrue(resolved.isPresent());
         assertTrue(resolved.get().isRestricted());
-        assertEquals(3, resolved.get().restrictedProjectIds.size());
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0001"));
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0002"));
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0003"));
-    }
-
-    @Test
-    @Transactional
-    void testResolveUserKeyWithTrailingCommaInRestrictedProjectIds() {
-        User user = User.create("testuser7", BcryptUtil.bcryptHash("password"), "user");
-        user.persist();
-
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "ROOT0001,ROOT0002,");
-
-        Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
-        assertTrue(resolved.isPresent());
-        assertTrue(resolved.get().isRestricted());
-        assertEquals(2, resolved.get().restrictedProjectIds.size());
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0001"));
-        assertTrue(resolved.get().restrictedProjectIds.contains("ROOT0002"));
-    }
-
-    @Test
-    @Transactional
-    void testResolveUserKeyWithEmptyRestrictedProjectIdsString() {
-        User user = User.create("testuser8", BcryptUtil.bcryptHash("password"), "user");
-        user.persist();
-
-        ApiKeyService.CreateResult result = apiKeyService.create(user.id, "Key", "");
-
-        Optional<ApiKey> resolved = apiKeyResolver.resolve(result.rawKey);
-        assertTrue(resolved.isPresent());
-        assertFalse(resolved.get().isRestricted());
+        assertEquals("READ", resolved.get().accessLevel);
     }
 }

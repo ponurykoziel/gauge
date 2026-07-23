@@ -34,10 +34,10 @@ public class ApiKeyService {
     }
 
     @Transactional
-    public CreateResult create(String userId, String name, String restrictedProjectIds) {
+    public CreateResult create(String userId, String name, String restrictedProjectId, String accessLevel) {
         String rawKey = "atk-" + UUID.randomUUID().toString();
         String keyHash = hashKey(rawKey);
-        ApiKey ak = ApiKey.create(userId, name, keyHash, restrictedProjectIds);
+        ApiKey ak = ApiKey.create(userId, name, keyHash, restrictedProjectId, accessLevel);
         ak.persist();
         return new CreateResult(ak, rawKey);
     }

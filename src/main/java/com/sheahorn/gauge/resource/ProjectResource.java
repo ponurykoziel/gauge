@@ -55,7 +55,7 @@ public class ProjectResource {
     @POST
     @Path("/{projectId}/issues")
     public Response createIssue(@PathParam("projectId") String projectId, CreateIssueRequest body) {
-        if (!accessGuard.canAccessProject(projectId)) {
+        if (!accessGuard.canWriteProject(projectId)) {
             return forbidden();
         }
         Priority priority = body.priority() != null ? body.priority() : Priority.NORMAL;
@@ -122,8 +122,8 @@ public class ProjectResource {
     )
     @POST
     public Response create(CreateProjectRequest body) {
-        // If parentId is set, check access to the parent
-        if (body.parentId() != null && !accessGuard.canAccessProject(body.parentId())) {
+        // If parentId is set, check write access to the parent
+        if (body.parentId() != null && !accessGuard.canWriteProject(body.parentId())) {
             return forbidden();
         }
         Project project = service.create(body.name(), body.description(), body.parentId());
@@ -198,7 +198,7 @@ public class ProjectResource {
     @PATCH
     @Path("/{projectId}")
     public Response patch(@PathParam("projectId") String projectId, PatchProjectRequest body) {
-        if (!accessGuard.canAccessProject(projectId)) {
+        if (!accessGuard.canWriteProject(projectId)) {
             return forbidden();
         }
         // Only admin can set removalLock
@@ -220,10 +220,10 @@ public class ProjectResource {
     @PATCH
     @Path("/{projectId}/parent")
     public Response reparent(@PathParam("projectId") String projectId, ReparentProjectRequest body) {
-        if (!accessGuard.canAccessProject(projectId)) {
+        if (!accessGuard.canWriteProject(projectId)) {
             return forbidden();
         }
-        if (body.parentId() != null && !accessGuard.canAccessProject(body.parentId())) {
+        if (body.parentId() != null && !accessGuard.canWriteProject(body.parentId())) {
             return forbidden();
         }
         return service.reparent(projectId, body.parentId())
@@ -248,7 +248,7 @@ public class ProjectResource {
     @DELETE
     @Path("/{projectId}")
     public Response delete(@PathParam("projectId") String projectId, @QueryParam("cascade") boolean cascade) {
-        if (!accessGuard.canAccessProject(projectId)) {
+        if (!accessGuard.canWriteProject(projectId)) {
             return forbidden();
         }
         if (service.isLocked(projectId)) {

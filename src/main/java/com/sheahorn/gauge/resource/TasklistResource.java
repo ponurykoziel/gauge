@@ -58,7 +58,7 @@ public class TasklistResource {
     @POST
     @Path("/{tasklistId}/tasks")
     public Response createTask(@PathParam("tasklistId") String tasklistId, CreateTaskRequest body) {
-        if (!accessGuard.canAccessTasklist(tasklistId)) {
+        if (!accessGuard.canWriteTasklist(tasklistId)) {
             return forbidden();
         }
         Task task = taskService.create(tasklistId, body.title(), body.description());
@@ -85,7 +85,7 @@ public class TasklistResource {
     @PATCH
     @Path("/{tasklistId}/task-order")
     public Response reorderTasks(@PathParam("tasklistId") String tasklistId, ReorderTasksRequest body) {
-        if (!accessGuard.canAccessTasklist(tasklistId)) {
+        if (!accessGuard.canWriteTasklist(tasklistId)) {
             return forbidden();
         }
         taskService.reorder(tasklistId, body.taskIds());
@@ -114,7 +114,7 @@ public class TasklistResource {
     @PATCH
     @Path("/{tasklistId}")
     public Response patch(@PathParam("tasklistId") String tasklistId, PatchTasklistRequest body) {
-        if (!accessGuard.canAccessTasklist(tasklistId)) {
+        if (!accessGuard.canWriteTasklist(tasklistId)) {
             return forbidden();
         }
         return service.patch(tasklistId, body.title())
@@ -129,7 +129,7 @@ public class TasklistResource {
     @PATCH
     @Path("/{tasklistId}/status")
     public Response updateStatus(@PathParam("tasklistId") String tasklistId, UpdateTasklistStatusRequest body) {
-        if (!accessGuard.canAccessTasklist(tasklistId)) {
+        if (!accessGuard.canWriteTasklist(tasklistId)) {
             return forbidden();
         }
         return service.updateStatus(tasklistId, body.status())
@@ -144,7 +144,7 @@ public class TasklistResource {
     @PATCH
     @Path("/{tasklistId}/decomposes-task")
     public Response linkDecomposedTask(@PathParam("tasklistId") String tasklistId, LinkDecomposedTaskRequest body) {
-        if (!accessGuard.canAccessTasklist(tasklistId)) {
+        if (!accessGuard.canWriteTasklist(tasklistId)) {
             return forbidden();
         }
         return service.updateDecomposesTask(tasklistId, body.taskId())
@@ -159,7 +159,7 @@ public class TasklistResource {
     @DELETE
     @Path("/{tasklistId}")
     public Response delete(@PathParam("tasklistId") String tasklistId, @QueryParam("cascade") boolean cascade) {
-        if (!accessGuard.canAccessTasklist(tasklistId)) {
+        if (!accessGuard.canWriteTasklist(tasklistId)) {
             return forbidden();
         }
         if (!cascade && service.hasChildren(tasklistId)) {
