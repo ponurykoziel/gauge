@@ -10,6 +10,8 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 import jakarta.ws.rs.ext.Provider;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import java.security.Principal;
 import java.util.Map;
 import java.util.Optional;
@@ -19,24 +21,46 @@ import java.util.Set;
 @Priority(Priorities.AUTHENTICATION)
 public class SecurityFilter implements ContainerRequestFilter {
 
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+        "login.html",
+        "login-failed.html",
+        "logout"
+    );
+
     @Inject
     ApiKeyResolver apiKeyResolver;
 
+    @Inject
+    CurrentApiKey currentApiKey;
+
+    @ConfigProperty(name = "gauge.auth.enabled", defaultValue = "true")
+    boolean authEnabled;
+
     @Override
     public void filter(ContainerRequestContext requestContext) {
-        String path = requestContext.getUriInfo().getPath();
-
-        // Only enforce Bearer token on /api/* paths
-        if (!path.startsWith("api/") && !path.equals("api")) {
+        if (!authEnabled) {
             return;
         }
 
-        // If already authenticated via session (form login), allow through
+        String path = requestContext.getUriInfo().getPath();
+
+        // Normalize: RESTEasy Reactive may include a leading slash
+        if (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+
+        // Public paths — no auth required
+        if (PUBLIC_PATHS.contains(path)) {
+            return;
+        }
+
+        // Already authenticated via session (form login) — allow through
         SecurityContext sec = requestContext.getSecurityContext();
         if (sec != null && sec.getUserPrincipal() != null) {
             return;
         }
 
+        // Everything else requires a Bearer token
         String authHeader = requestContext.getHeaderString(HttpHeaders.AUTHORIZATION);
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -58,6 +82,7 @@ public class SecurityFilter implements ContainerRequestFilter {
 
         ApiKey apiKey = resolved.get();
         requestContext.setProperty("gauge.api-key", apiKey);
+        currentApiKey.set(apiKey);
 
         // Set a SecurityContext so @RolesAllowed works for Bearer token users
         requestContext.setSecurityContext(new ApiKeySecurityContext(apiKey));

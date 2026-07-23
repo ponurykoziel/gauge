@@ -36,7 +36,13 @@ public class ApiKeyResolver {
         if (entity != null) {
             User user = User.findById(entity.userId);
             if (user != null) {
-                return Optional.of(new ApiKey(user.id, user.username, user.role));
+                return Optional.of(new ApiKey(
+                    user.id,
+                    user.username,
+                    user.role,
+                    entity.restrictedProjectId,
+                    entity.accessLevel
+                ));
             }
         }
         return Optional.empty();

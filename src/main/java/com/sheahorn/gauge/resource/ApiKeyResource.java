@@ -1,6 +1,7 @@
 package com.sheahorn.gauge.resource;
 
 import com.sheahorn.gauge.domain.ApiKey;
+import com.sheahorn.gauge.security.ProjectAccessGuard;
 import com.sheahorn.gauge.service.ApiKeyService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -20,6 +21,9 @@ public class ApiKeyResource {
     @Inject
     ApiKeyService service;
 
+    @Inject
+    ProjectAccessGuard accessGuard;
+
     @Context
     SecurityContext securityContext;
 
@@ -31,7 +35,16 @@ public class ApiKeyResource {
         }
         List<ApiKey> keys = service.findByUserId(userId);
         var result = keys.stream()
-                .map(k -> Map.of("id", k.id, "name", k.name))
+                .map(k -> {
+                    var m = new java.util.HashMap<String, Object>();
+                    m.put("id", k.id);
+                    m.put("name", k.name);
+                    if (k.restrictedProjectId != null && !k.restrictedProjectId.isBlank()) {
+                        m.put("restrictedProjectId", k.restrictedProjectId);
+                        m.put("accessLevel", k.accessLevel != null ? k.accessLevel : "READ");
+                    }
+                    return m;
+                })
                 .toList();
         return Response.ok(result).build();
     }
@@ -46,13 +59,25 @@ public class ApiKeyResource {
         if (name == null || name.isBlank()) {
             name = "API Key";
         }
-        ApiKeyService.CreateResult result = service.create(userId, name);
+        String restrictedProjectId = (String) body.get("restrictedProjectId");
+        String accessLevel = (String) body.get("accessLevel");
+        if (restrictedProjectId != null && restrictedProjectId.isBlank()) {
+            restrictedProjectId = null;
+        }
+        if (accessLevel == null || accessLevel.isBlank()) {
+            accessLevel = "READ";
+        }
+        ApiKeyService.CreateResult result = service.create(userId, name, restrictedProjectId, accessLevel);
+        var entity = new java.util.HashMap<String, Object>();
+        entity.put("id", result.apiKey.id);
+        entity.put("name", result.apiKey.name);
+        entity.put("key", result.rawKey);
+        if (restrictedProjectId != null) {
+            entity.put("restrictedProjectId", restrictedProjectId);
+            entity.put("accessLevel", accessLevel);
+        }
         return Response.status(Response.Status.CREATED)
-                .entity(Map.of(
-                    "id", result.apiKey.id,
-                    "name", result.apiKey.name,
-                    "key", result.rawKey
-                ))
+                .entity(entity)
                 .build();
     }
 

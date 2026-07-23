@@ -2,12 +2,11 @@
 
 Ride shotgun with your daemons.
 
-Gauge is a work tracker for a team of two - silicon driver and carbon navigator. The design follows the core cooperation dynamics principle: Human chooses the course, LLM does the job. The tracker is profiled primarily for LLM use, with simple, human-friendly UI establishing communication ground between each of teammates.
+Gauge is a work tracker for a team of two — silicon driver and carbon navigator. The design follows the core cooperation dynamics principle: Human chooses the course, LLM does the job. The tracker is profiled primarily for LLM use, with a simple, human-friendly UI establishing communication ground between each of teammates.
 
-Gauge provides just enough structure to organize a workstream or project of any scope (hence the name). The project is driven by the belief that simplicity and communication are far more efficient than constraints and bureaucracy.
-Ockham's razor always beats whips and chains, regardless of participants and their substrate.
+Gauge provides just enough structure to organize a workstream or project of any scope (hence the name). The project is driven by the belief that simplicity and communication are far more efficient than constraints and bureaucracy. Ockham's razor always beats whips and chains, regardless of participants and their substrate.
 
-Settle comfortably in the passengers seat. Let your your AI companion steer, and hold the roadmap.
+Settle comfortably in the passenger's seat. Let your AI companion steer, and hold the roadmap.
 
 ## Quick Start
 
@@ -16,31 +15,34 @@ Settle comfortably in the passengers seat. Let your your AI companion steer, and
 ```bash
 mvn clean package
 ```
+
 Requires Java 17 and Maven.
 
 ### 2. Configure
 
-You must configure security before using Gauge. Change at least master API key and pepper in `application.properties` from project's root. The app **refuses to start** if the master API key is still `change-me`.
+You must configure security before using Gauge. Change at least the master API key and pepper in `application.properties`. The app **refuses to start** if the master API key is still `change-me`.
 
-interface: `127.0.0.1`
-port: `8087`
-default credentials: `admin/admin`
-master API key: `change-me`
-pepper: `change-me`
+| Default | Value |
+|---|---|
+| Interface | `127.0.0.1` |
+| Port | `8087` |
+| Admin credentials | `admin` / `admin` |
+| Master API key | `change-me` |
+| Pepper | `change-me` |
 
-Consider changing default credentials if you expose Gauge to the open network. You can create additional users and API keys in the application. 
+Consider changing default credentials if you expose Gauge to the open network. You can create additional users and API keys in the application.
 
 ### 3. Run
 
 ```bash
 ./runner.sh
 ```
-Runner script supplies Gauge with additional `application.properties`, which override defaults from the jar. If you want to avoid this step, you have to modify sources (see Configuration below).
+
+The runner script supplies Gauge with additional `application.properties`, which override defaults from the jar. If you want to avoid this step, modify sources directly (see Configuration below).
 
 ### 4. Use
 
-The app listens on `http://127.0.0.1:8087` by default. UI is available at `/`.
-OpenAPI specs are available at `/q/swagger-ui`.
+The app listens on `http://127.0.0.1:8087` by default. UI is available at `/`. OpenAPI specs are available at `/q/swagger-ui`.
 
 ## Configuration
 
@@ -50,11 +52,12 @@ All settings live in `application.properties`. The minimal viable set:
 |---|---|
 | `gauge.api-key.access` | Master Bearer token for API access |
 | `gauge.api-key.pepper` | Pepper for hashing user-created API keys |
+| `gauge.auth.enabled` | Toggle for the SecurityFilter (default `true`). Set to `false` to disable Bearer token enforcement entirely. |
 | `gauge.auth.admin.username` / `.password` | Seeded admin user for the browser UI |
 | `quarkus.http.port` | HTTP listen port |
-| `quarkus.hibernate-orm.database.generation` | Hibernate's DDL value |
+| `quarkus.hibernate-orm.database.generation` | Hibernate DDL value |
 
-If you want the app to listen on all interfaces (respond to everybody), set host to `0.0.0.0`. Default DDL is set to `none`, which effectively will halt the startup. Safest startup choice is `update`.
+If you want the app to listen on all interfaces, set host to `0.0.0.0`. Default DDL is set to `none`, which will halt startup. Safest startup choice is `update`.
 
 ## Authentication
 
@@ -65,9 +68,20 @@ Two parallel auth mechanisms:
 
 API endpoints also accept the session cookie, so a browser session works for both UI and API calls.
 
+### API Key Restrictions
+
+User-created API keys can be **restricted to a single project** (and its descendants) with an access level:
+
+- **READ** — can only view the project and its children. Cannot create, modify, or delete anything.
+- **WRITE** — full CRUD access within the project tree. Cannot create root projects (must create under the scoped project).
+
+Unrestricted keys (no project set) have full access to everything. The master key is always unrestricted.
+
+The SecurityFilter enforces Bearer token authentication on **all paths** except `login.html`, `login-failed.html`, and `logout`. Every other endpoint — API, UI pages, root — requires a valid token or session.
+
 ## Data Model
 
-Gauge uses a straightforward data model for expressing worksteams:
+Gauge uses a straightforward data model for expressing workstreams:
 
 ```
 Project  →  Issue  →  Tasklist  →  Task
@@ -75,20 +89,20 @@ Project  →  Issue  →  Tasklist  →  Task
 
 Each level adds a different kind of structure rather than repeating the same pattern:
 
-- **Projects** form a *tree structure* of subprojects. Tree structure is an organising agent, allowing to adjust granularity of concerns until the distribution reaches satisfying levels. 
-- **Issues** are a flat *set* within a project. No tags, no cross-project links. Fuzzy relationships live in titles and descriptions, not in the schema. This is where the human and the LLM negotiate meaning. Issues act as a coupling "clutch" between subprojects and tasks - real-world requirements are rarely trivial enough to fit in a closed system. Gauge chooses communication over squeezing needs into structures.
+- **Projects** form a *tree structure* of subprojects. Tree structure is an organising agent, allowing adjustment of granularity until the distribution reaches satisfying levels.
+- **Issues** are a flat *set* within a project. No tags, no cross-project links. Fuzzy relationships live in titles and descriptions, not in the schema. This is where the human and the LLM negotiate meaning. Issues act as a coupling "clutch" between subprojects and tasks — real-world requirements are rarely trivial enough to fit in a closed system. Gauge chooses communication over squeezing needs into structures.
 - **Tasklists** express *independent sub-workstreams* within an issue.
-- **Tasks** are *ordered steps* within a tasklist. A task is considered an atomic operation from its tasklists' point of view.
+- **Tasks** are *ordered steps* within a tasklist. A task is considered an atomic operation from its tasklist's point of view.
 - **Tasklists can decompose a task** — A task can refer to a whole tasklist within the same issue. The tasklist becomes the breakdown of that task. This is used primarily for creating execution tasklists, scheduling executions of other tasklists.
 
-| Level | Coupling | | Relation | Meaning |
+| Level | Coupling | Relation | Meaning |
 |---|---|---|---|
 | Project | Tree | Containing | Explicit hierarchy, no depth limits |
 | Issue | Undefined | Semantic | Fuzzy, unknown, inexpressible in simple terms, negotiated by human and LLM |
 | Tasklist | Horizontal | Neighbouring | Independent sub-workstreams |
 | Task | Vertical | Following | Ordered, atomic steps |
 
-Please note that a task can simply state it refers to a project, creating a semantic loopback in the structure. This hack, however, is useful only when refactoring implementation plans is costly, and only occurs after enough bad planning decisions are made. 
+Please note that a task can simply state it refers to a project, creating a semantic loopback in the structure. This hack, however, is useful only when refactoring implementation plans is costly, and only occurs after enough bad planning decisions are made.
 
 ## API
 
@@ -128,7 +142,7 @@ ID migration from UUID to sequential hex-8. One-time, destructive, guarded by a 
 
 ## Docker
 
-An example docker setup is provided in `docker/`. This example contains an nginx handling HTTPS, required for open network exposure. 
+An example docker setup is provided in `docker/`. This example contains an nginx handling HTTPS, required for open network exposure.
 
 ```bash
 cd docker
