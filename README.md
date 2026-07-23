@@ -118,6 +118,12 @@ List, create, get current user (`/me`), change password, delete. Admin-only for 
 
 Create (returns raw key once — store it), list, delete. Keys are hashed with SHA-256 + pepper.
 
+Keys can be **restricted to a single project** (and its descendants) with an access level:
+- **READ** — can only view the project and its children
+- **WRITE** — full CRUD access within the project tree
+
+Unrestricted keys (no project set) have full access to everything. The master key is always unrestricted.
+
 ### Favorites (`/api/favorites`)
 
 Per-user project bookmarks. Add, remove, list, reset.
