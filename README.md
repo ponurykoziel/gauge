@@ -75,7 +75,7 @@ User-created API keys can be **restricted to a single project** (and its descend
 - **READ** — can only view the project and its children. Cannot create, modify, or delete anything.
 - **WRITE** — full CRUD access within the project tree. Cannot create root projects (must create under the scoped project).
 
-Unrestricted keys (no project set) have full access to everything. The master key is always unrestricted.
+Restricted keys see only their scoped project tree in all endpoints — including list, search, and analysis results. Unrestricted keys (no project set) have full access to everything. The master key is always unrestricted.
 
 The SecurityFilter enforces Bearer token authentication on **all paths** except `login.html`, `login-failed.html`, and `logout`. Every other endpoint — API, UI pages, root — requires a valid token or session.
 

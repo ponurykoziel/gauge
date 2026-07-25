@@ -7,6 +7,7 @@ import com.sheahorn.gauge.domain.IssueStatus;
 import com.sheahorn.gauge.domain.PatchProjectRequest;
 import com.sheahorn.gauge.domain.Priority;
 import com.sheahorn.gauge.domain.Project;
+import com.sheahorn.gauge.domain.ProjectAnalysisResult;
 import com.sheahorn.gauge.domain.ReparentProjectRequest;
 import com.sheahorn.gauge.domain.SortOption;
 import com.sheahorn.gauge.security.ProjectAccessGuard;
@@ -237,7 +238,14 @@ public class ProjectResource {
     @GET
     @Path("/analysis")
     public Response analyze() {
-        return Response.ok(analysisService.analyzeAll()).build();
+        Map<String, ProjectAnalysisResult> all = analysisService.analyzeAll();
+        Map<String, ProjectAnalysisResult> filtered = new java.util.HashMap<>();
+        for (var entry : all.entrySet()) {
+            if (accessGuard.canAccessProject(entry.getKey())) {
+                filtered.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return Response.ok(filtered).build();
     }
 
     @Operation(
