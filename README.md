@@ -104,6 +104,18 @@ Each level adds a different kind of structure rather than repeating the same pat
 
 Please note that a task can simply state it refers to a project, creating a semantic loopback in the structure. This hack, however, is useful only when refactoring implementation plans is costly, and only occurs after enough bad planning decisions are made.
 
+### Statuses
+
+| Level | Statuses |
+|---|---|
+| Issue | `TODO`, `DOING`, `DONE`, `INACTIVE` |
+| Tasklist | `TODO`, `DOING`, `DONE`, `CANCELED` |
+| Task | `TODO`, `DOING`, `DONE`, `FAILED`, `CANCELED` |
+
+Every entity starts in `TODO`. Transitions are unrestricted — there is no state machine.
+
+`INACTIVE` (issues only) means **parked**: not being worked on, and not finished. It is the *least important* status — it ranks below `DONE` and never displaces it. Parked issues never bubble a priority (a parked `HIGH` issue does not make its project `HIGH`), and `INACTIVE` surfaces in project analysis only when nothing is active and nothing is done. Ordering is `TODO, DOING, DONE, INACTIVE` everywhere — active work first, finished next, parked last — and parked issues are shown by default in the project issue list (unlike `DONE`).
+
 ## API
 
 All `/api/*` endpoints require a Bearer token. The API mirrors the data model:
@@ -114,7 +126,7 @@ CRUD, search (`?q=`), list by parent (`?parentId=`), flat list (`?flat=true`), l
 
 ### Issues (`/api/issues`, `/api/projects/{id}/issues`)
 
-CRUD, search, sort (`?sort=NAME|PRIORITY_STATUS_NAME|...`), filter by priority and status (`?priority=HIGH&status=TODO`), move to another project, cascade delete.
+CRUD, search, sort (`?sort=NAME|PRIORITY_STATUS_NAME|...`), filter by priority and status (`?priority=HIGH&status=TODO,INACTIVE`), move to another project, cascade delete. Statuses: `TODO`, `DOING`, `DONE`, `INACTIVE` — see [Statuses](#statuses).
 
 ### Tasklists (`/api/tasklists`, `/api/issues/{id}/tasklists`)
 
@@ -159,4 +171,4 @@ The coupling model at each level is deliberate. Projects are rigid trees. Issues
 
 ## License
 
-MIT — do whatever you want, just keep the copyright notice. See [LICENSE.md](LICENSE.md).
+MIT — do whatever you want, just keep the copyright notice. See [LICENSE](LICENSE).
