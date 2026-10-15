@@ -80,7 +80,7 @@ public class ProjectAnalysisService {
             Map<String, List<Tasklist>> tasklistsByIssue,
             Map<String, List<Task>> tasksByTasklist) {
 
-        int issueTodo = 0, issueDoing = 0, issueDone = 0;
+        int issueTodo = 0, issueDoing = 0, issueInactive = 0, issueDone = 0;
         int subprojectCount = 0;
         int taskTodo = 0, taskDoing = 0;
         Priority highestPriority = null;
@@ -91,10 +91,13 @@ public class ProjectAnalysisService {
             switch (issue.status()) {
                 case TODO -> issueTodo++;
                 case DOING -> issueDoing++;
+                case INACTIVE -> issueInactive++;
                 case DONE -> issueDone++;
             }
-            // Track highest priority among non-DONE issues
-            if (issue.status() != IssueStatus.DONE) {
+            // Track highest priority among active (TODO/DOING) issues only.
+            // INACTIVE issues are parked — they demand no attention, so they
+            // neither bubble a priority nor count as finished work.
+            if (issue.status() == IssueStatus.TODO || issue.status() == IssueStatus.DOING) {
                 if (highestPriority == null || issue.priority().severity > highestPriority.severity) {
                     highestPriority = issue.priority();
                 }
@@ -120,13 +123,15 @@ public class ProjectAnalysisService {
                 childrenByParent, issuesByProject, tasklistsByIssue, tasksByTasklist);
             issueTodo += childResult.issueTodo;
             issueDoing += childResult.issueDoing;
+            issueInactive += childResult.issueInactive;
             issueDone += childResult.issueDone;
             subprojectCount += childResult.subprojectCount;
             taskTodo += childResult.taskTodo;
             taskDoing += childResult.taskDoing;
-            // Merge highest priority from child
+            // Merge highest priority from child (only real priorities bubble)
             if (childResult.bubbledPriority != BubbledPriority.NONE
-                && childResult.bubbledPriority != BubbledPriority.DONE) {
+                && childResult.bubbledPriority != BubbledPriority.DONE
+                && childResult.bubbledPriority != BubbledPriority.INACTIVE) {
                 Priority childPrio = switch (childResult.bubbledPriority) {
                     case HIGH -> Priority.HIGH;
                     case NORMAL -> Priority.NORMAL;
@@ -139,19 +144,31 @@ public class ProjectAnalysisService {
             }
         }
 
-        BubbledPriority bp = computeBubbledPriority(issueTodo + issueDoing, issueDone, highestPriority);
-        return new ProjectAnalysisResult(issueTodo, issueDoing, issueDone,
+        BubbledPriority bp = computeBubbledPriority(
+            issueTodo + issueDoing, issueInactive, issueDone, highestPriority);
+        return new ProjectAnalysisResult(issueTodo, issueDoing, issueInactive, issueDone,
             subprojectCount, taskTodo, taskDoing, bp);
     }
 
-    private BubbledPriority computeBubbledPriority(int activeCount, int doneCount, Priority highestPriority) {
-        if (activeCount == 0 && doneCount == 0) return BubbledPriority.NONE;
-        if (activeCount == 0) return BubbledPriority.DONE;
-        if (highestPriority == null) return BubbledPriority.NONE;
-        return switch (highestPriority) {
-            case HIGH -> BubbledPriority.HIGH;
-            case NORMAL -> BubbledPriority.NORMAL;
-            case LOW -> BubbledPriority.LOW;
-        };
+    /**
+     * Bubbled priority resolution:
+     * 1. nothing at all            → NONE
+     * 2. any active issue          → highest active priority (LOW/NORMAL/HIGH)
+     * 3. no active, some INACTIVE  → INACTIVE (parked work, not finished)
+     * 4. no active, all DONE       → DONE
+     */
+    private BubbledPriority computeBubbledPriority(int activeCount, int inactiveCount,
+                                                   int doneCount, Priority highestPriority) {
+        if (activeCount == 0 && inactiveCount == 0 && doneCount == 0) return BubbledPriority.NONE;
+        if (activeCount > 0) {
+            if (highestPriority == null) return BubbledPriority.NONE;
+            return switch (highestPriority) {
+                case HIGH -> BubbledPriority.HIGH;
+                case NORMAL -> BubbledPriority.NORMAL;
+                case LOW -> BubbledPriority.LOW;
+            };
+        }
+        if (inactiveCount > 0) return BubbledPriority.INACTIVE;
+        return BubbledPriority.DONE;
     }
 }

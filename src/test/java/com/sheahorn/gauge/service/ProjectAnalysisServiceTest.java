@@ -449,4 +449,102 @@ class ProjectAnalysisServiceTest {
         assertEquals(0, r.taskDoing);
         assertEquals(BubbledPriority.NONE, r.bubbledPriority);
     }
+
+    // ---- 24: INACTIVE issues are counted but never bubble a priority ----
+
+    @Test
+    @Transactional
+    void testInactiveIssueCountedButNotBubbled() {
+        createProject("P0000001", "P", null);
+        createIssue("I0000001", "P0000001", "Parked", Priority.HIGH, IssueStatus.INACTIVE);
+
+        Map<String, ProjectAnalysisResult> results = analysisService.analyzeAll();
+        ProjectAnalysisResult r = results.get("P0000001");
+        assertEquals(0, r.issueTodo);
+        assertEquals(0, r.issueDoing);
+        assertEquals(1, r.issueInactive);
+        assertEquals(0, r.issueDone);
+        // parked HIGH must not make the project HIGH
+        assertEquals(BubbledPriority.INACTIVE, r.bubbledPriority);
+    }
+
+    // ---- 25: active LOW beats parked HIGH ----
+
+    @Test
+    @Transactional
+    void testActiveLowBeatsParkedHigh() {
+        createProject("P0000001", "P", null);
+        createIssue("I0000001", "P0000001", "Parked", Priority.HIGH, IssueStatus.INACTIVE);
+        createIssue("I0000002", "P0000001", "Active", Priority.LOW, IssueStatus.TODO);
+
+        Map<String, ProjectAnalysisResult> results = analysisService.analyzeAll();
+        assertEquals(BubbledPriority.LOW, results.get("P0000001").bubbledPriority);
+    }
+
+    // ---- 26: DONE + INACTIVE → INACTIVE (parked work means not finished) ----
+
+    @Test
+    @Transactional
+    void testDonePlusInactiveIsInactive() {
+        createProject("P0000001", "P", null);
+        createIssue("I0000001", "P0000001", "Done", Priority.NORMAL, IssueStatus.DONE);
+        createIssue("I0000002", "P0000001", "Parked", Priority.NORMAL, IssueStatus.INACTIVE);
+
+        Map<String, ProjectAnalysisResult> results = analysisService.analyzeAll();
+        ProjectAnalysisResult r = results.get("P0000001");
+        assertEquals(1, r.issueDone);
+        assertEquals(1, r.issueInactive);
+        assertEquals(BubbledPriority.INACTIVE, r.bubbledPriority);
+    }
+
+    // ---- 27: all four statuses counted independently ----
+
+    @Test
+    @Transactional
+    void testAllFourStatusesCounted() {
+        createProject("P0000001", "P", null);
+        createIssue("I0000001", "P0000001", "Todo", Priority.NORMAL, IssueStatus.TODO);
+        createIssue("I0000002", "P0000001", "Doing", Priority.NORMAL, IssueStatus.DOING);
+        createIssue("I0000003", "P0000001", "Parked", Priority.NORMAL, IssueStatus.INACTIVE);
+        createIssue("I0000004", "P0000001", "Done", Priority.NORMAL, IssueStatus.DONE);
+
+        Map<String, ProjectAnalysisResult> results = analysisService.analyzeAll();
+        ProjectAnalysisResult r = results.get("P0000001");
+        assertEquals(1, r.issueTodo);
+        assertEquals(1, r.issueDoing);
+        assertEquals(1, r.issueInactive);
+        assertEquals(1, r.issueDone);
+        assertEquals(BubbledPriority.NORMAL, r.bubbledPriority);
+    }
+
+    // ---- 28: INACTIVE bubbles up from a subproject ----
+
+    @Test
+    @Transactional
+    void testInactiveBubblesUpFromSubproject() {
+        createProject("P0000001", "Parent", null);
+        createProject("P0000002", "Child", "P0000001");
+        createIssue("I0000001", "P0000002", "Parked", Priority.HIGH, IssueStatus.INACTIVE);
+
+        Map<String, ProjectAnalysisResult> results = analysisService.analyzeAll();
+        assertEquals(BubbledPriority.INACTIVE, results.get("P0000002").bubbledPriority);
+        ProjectAnalysisResult parent = results.get("P0000001");
+        assertEquals(1, parent.issueInactive);
+        assertEquals(BubbledPriority.INACTIVE, parent.bubbledPriority);
+    }
+
+    // ---- 29: parked issue under an active project does not change the bubble ----
+
+    @Test
+    @Transactional
+    void testInactiveUnderActiveProjectKeepsActiveBubble() {
+        createProject("P0000001", "Parent", null);
+        createProject("P0000002", "Child", "P0000001");
+        createIssue("I0000001", "P0000001", "Active", Priority.NORMAL, IssueStatus.DOING);
+        createIssue("I0000002", "P0000002", "Parked", Priority.HIGH, IssueStatus.INACTIVE);
+
+        Map<String, ProjectAnalysisResult> results = analysisService.analyzeAll();
+        assertEquals(BubbledPriority.INACTIVE, results.get("P0000002").bubbledPriority);
+        assertEquals(BubbledPriority.NORMAL, results.get("P0000001").bubbledPriority);
+    }
 }

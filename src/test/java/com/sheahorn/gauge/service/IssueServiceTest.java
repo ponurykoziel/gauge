@@ -488,4 +488,53 @@ class IssueServiceTest {
             issueService.create("P0000001", "Test", "Desc", null)
         );
     }
+
+    // ---- 27: status ordering — TODO, DOING, INACTIVE, DONE ----
+
+    @Test
+    @Transactional
+    void testStatusOrderingIncludesInactive() {
+        Issue done = createIssue("P0000001", "Done", Priority.NORMAL);
+        issueService.updateStatus(done.id(), IssueStatus.DONE);
+        Issue parked = createIssue("P0000001", "Parked", Priority.NORMAL);
+        issueService.updateStatus(parked.id(), IssueStatus.INACTIVE);
+        Issue doing = createIssue("P0000001", "Doing", Priority.NORMAL);
+        issueService.updateStatus(doing.id(), IssueStatus.DOING);
+        createIssue("P0000001", "Todo", Priority.NORMAL);
+
+        List<Issue> sorted = issueService.findByProjectIdSortedAndFiltered(
+            "P0000001", SortOption.STATUS_PRIORITY_NAME, null, null);
+        assertEquals(4, sorted.size());
+        assertEquals(IssueStatus.TODO, sorted.get(0).status());
+        assertEquals(IssueStatus.DOING, sorted.get(1).status());
+        assertEquals(IssueStatus.INACTIVE, sorted.get(2).status());
+        assertEquals(IssueStatus.DONE, sorted.get(3).status());
+    }
+
+    // ---- 28: filter by INACTIVE status ----
+
+    @Test
+    @Transactional
+    void testFilterByInactiveStatus() {
+        Issue parked = createIssue("P0000001", "Parked", Priority.HIGH);
+        issueService.updateStatus(parked.id(), IssueStatus.INACTIVE);
+        createIssue("P0000001", "Todo", Priority.HIGH);
+
+        List<Issue> inactiveOnly = issueService.findByProjectIdSortedAndFiltered(
+            "P0000001", SortOption.PRIORITY_STATUS_NAME, null, Set.of(IssueStatus.INACTIVE));
+        assertEquals(1, inactiveOnly.size());
+        assertEquals("Parked", inactiveOnly.get(0).title());
+        assertEquals(IssueStatus.INACTIVE, inactiveOnly.get(0).status());
+    }
+
+    // ---- 29: updateStatus → INACTIVE round-trip ----
+
+    @Test
+    @Transactional
+    void testUpdateStatusToInactive() {
+        Issue created = createIssue("P0000001", "Test", Priority.NORMAL);
+        Optional<Issue> updated = issueService.updateStatus(created.id(), IssueStatus.INACTIVE);
+        assertTrue(updated.isPresent());
+        assertEquals(IssueStatus.INACTIVE, updated.get().status());
+    }
 }

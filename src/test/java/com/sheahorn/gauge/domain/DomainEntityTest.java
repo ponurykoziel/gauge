@@ -202,6 +202,7 @@ class DomainEntityTest {
         ProjectAnalysisResult r = new ProjectAnalysisResult();
         assertEquals(0, r.issueTodo);
         assertEquals(0, r.issueDoing);
+        assertEquals(0, r.issueInactive);
         assertEquals(0, r.issueDone);
         assertEquals(0, r.subprojectCount);
         assertEquals(0, r.taskTodo);
@@ -211,13 +212,14 @@ class DomainEntityTest {
 
     @Test
     void testProjectAnalysisResultParameterizedConstructor() {
-        ProjectAnalysisResult r = new ProjectAnalysisResult(1, 2, 3, 4, 5, 6, BubbledPriority.HIGH);
+        ProjectAnalysisResult r = new ProjectAnalysisResult(1, 2, 3, 4, 5, 6, 7, BubbledPriority.HIGH);
         assertEquals(1, r.issueTodo);
         assertEquals(2, r.issueDoing);
-        assertEquals(3, r.issueDone);
-        assertEquals(4, r.subprojectCount);
-        assertEquals(5, r.taskTodo);
-        assertEquals(6, r.taskDoing);
+        assertEquals(3, r.issueInactive);
+        assertEquals(4, r.issueDone);
+        assertEquals(5, r.subprojectCount);
+        assertEquals(6, r.taskTodo);
+        assertEquals(7, r.taskDoing);
         assertEquals(BubbledPriority.HIGH, r.bubbledPriority);
     }
 
@@ -225,9 +227,10 @@ class DomainEntityTest {
 
     @Test
     void testIssueStatusEnum() {
-        assertEquals(3, IssueStatus.values().length);
+        assertEquals(4, IssueStatus.values().length);
         assertEquals(IssueStatus.TODO, IssueStatus.valueOf("TODO"));
         assertEquals(IssueStatus.DOING, IssueStatus.valueOf("DOING"));
+        assertEquals(IssueStatus.INACTIVE, IssueStatus.valueOf("INACTIVE"));
         assertEquals(IssueStatus.DONE, IssueStatus.valueOf("DONE"));
     }
 
@@ -260,9 +263,10 @@ class DomainEntityTest {
 
     @Test
     void testBubbledPriorityEnum() {
-        assertEquals(5, BubbledPriority.values().length);
+        assertEquals(6, BubbledPriority.values().length);
         assertEquals(BubbledPriority.NONE, BubbledPriority.valueOf("NONE"));
         assertEquals(BubbledPriority.DONE, BubbledPriority.valueOf("DONE"));
+        assertEquals(BubbledPriority.INACTIVE, BubbledPriority.valueOf("INACTIVE"));
         assertEquals(BubbledPriority.LOW, BubbledPriority.valueOf("LOW"));
         assertEquals(BubbledPriority.NORMAL, BubbledPriority.valueOf("NORMAL"));
         assertEquals(BubbledPriority.HIGH, BubbledPriority.valueOf("HIGH"));

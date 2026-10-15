@@ -6,8 +6,10 @@ Each entity level has an appropriate status enum reflecting its role in the mode
 ## Statuses
 
 ### IssueStatus
-`TODO → DOING → DONE`
-- Simple linear progression. Issues represent concerns; they're either pending, active, or resolved.
+`TODO → DOING → INACTIVE → DONE`
+- Simple linear progression. Issues represent concerns; they're either pending, active, parked, or resolved.
+- `INACTIVE` — parked. The issue is not being worked on and is not finished. It demands no attention (it never bubbles a priority) and it does not count as finished work (a project with parked issues is not `DONE`).
+- Status ordering (sorting, filtering, analysis columns) is `TODO, DOING, INACTIVE, DONE` — active work first, parked next, finished last.
 
 ### TasklistStatus
 `TODO → DOING → DONE, CANCELED`

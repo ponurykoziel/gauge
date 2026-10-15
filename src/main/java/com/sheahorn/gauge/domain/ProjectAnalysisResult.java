@@ -7,6 +7,7 @@ package com.sheahorn.gauge.domain;
 public class ProjectAnalysisResult {
     public int issueTodo;
     public int issueDoing;
+    public int issueInactive;
     public int issueDone;
     public int subprojectCount;
     public int taskTodo;
@@ -15,11 +16,12 @@ public class ProjectAnalysisResult {
 
     public ProjectAnalysisResult() {}
 
-    public ProjectAnalysisResult(int issueTodo, int issueDoing, int issueDone,
+    public ProjectAnalysisResult(int issueTodo, int issueDoing, int issueInactive, int issueDone,
                                   int subprojectCount, int taskTodo, int taskDoing,
                                   BubbledPriority bubbledPriority) {
         this.issueTodo = issueTodo;
         this.issueDoing = issueDoing;
+        this.issueInactive = issueInactive;
         this.issueDone = issueDone;
         this.subprojectCount = subprojectCount;
         this.taskTodo = taskTodo;

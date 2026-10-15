@@ -143,6 +143,7 @@
             html += '<div class="tree-cell-prio">' + bpPill(a.bubbledPriority) + '</div>';
             html += '<div class="tree-cell-stat">' + statCell(a.issueTodo, 'todo') + '</div>';
             html += '<div class="tree-cell-stat">' + statCell(a.issueDoing, 'doing') + '</div>';
+            html += '<div class="tree-cell-stat">' + statCell(a.issueInactive, 'inactive') + '</div>';
             html += '<div class="tree-cell-stat">' + statCell(a.issueDone, 'done') + '</div>';
             html += '<div class="tree-cell-stat">' + statCell(a.subprojectCount, 'text') + '</div>';
             html += '<div class="tree-cell-stat">' + statCell(a.taskTodo, 'todo') + '</div>';
@@ -196,6 +197,7 @@
         html += '<div class="tree-cell-prio" title="Bubbled priority"><span class="th-line">Prio</span></div>';
         html += '<div class="tree-cell-stat" title="Issues TODO (recursive)"><span class="th-line">issues</span><span class="th-line">todo</span></div>';
         html += '<div class="tree-cell-stat" title="Issues DOING (recursive)"><span class="th-line">issues</span><span class="th-line">doing</span></div>';
+        html += '<div class="tree-cell-stat" title="Issues INACTIVE (recursive)"><span class="th-line">issues</span><span class="th-line">inactive</span></div>';
         html += '<div class="tree-cell-stat" title="Issues DONE (recursive)"><span class="th-line">issues</span><span class="th-line">done</span></div>';
         html += '<div class="tree-cell-stat" title="Subprojects (recursive)"><span class="th-line">subs</span></div>';
         html += '<div class="tree-cell-stat" title="Tasks TODO (recursive)"><span class="th-line">tasks</span><span class="th-line">todo</span></div>';

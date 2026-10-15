@@ -117,7 +117,8 @@ public class IssueService {
         return switch (s) {
             case TODO -> 0;
             case DOING -> 1;
-            case DONE -> 2;
+            case INACTIVE -> 2;
+            case DONE -> 3;
         };
     }
 
