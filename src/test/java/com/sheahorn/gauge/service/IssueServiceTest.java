@@ -507,8 +507,8 @@ class IssueServiceTest {
         assertEquals(4, sorted.size());
         assertEquals(IssueStatus.TODO, sorted.get(0).status());
         assertEquals(IssueStatus.DOING, sorted.get(1).status());
-        assertEquals(IssueStatus.INACTIVE, sorted.get(2).status());
-        assertEquals(IssueStatus.DONE, sorted.get(3).status());
+        assertEquals(IssueStatus.DONE, sorted.get(2).status());
+        assertEquals(IssueStatus.INACTIVE, sorted.get(3).status());
     }
 
     // ---- 28: filter by INACTIVE status ----

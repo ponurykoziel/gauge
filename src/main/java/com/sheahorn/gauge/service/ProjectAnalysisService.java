@@ -152,10 +152,10 @@ public class ProjectAnalysisService {
 
     /**
      * Bubbled priority resolution:
-     * 1. nothing at all            → NONE
-     * 2. any active issue          → highest active priority (LOW/NORMAL/HIGH)
-     * 3. no active, some INACTIVE  → INACTIVE (parked work, not finished)
-     * 4. no active, all DONE       → DONE
+     * 1. nothing at all                   → NONE
+     * 2. any active issue                 → highest active priority (LOW/NORMAL/HIGH)
+     * 3. no active, some DONE             → DONE
+     * 4. no active, only parked INACTIVE  → INACTIVE
      */
     private BubbledPriority computeBubbledPriority(int activeCount, int inactiveCount,
                                                    int doneCount, Priority highestPriority) {
@@ -168,7 +168,7 @@ public class ProjectAnalysisService {
                 case LOW -> BubbledPriority.LOW;
             };
         }
-        if (inactiveCount > 0) return BubbledPriority.INACTIVE;
-        return BubbledPriority.DONE;
+        if (doneCount > 0) return BubbledPriority.DONE;
+        return BubbledPriority.INACTIVE;
     }
 }

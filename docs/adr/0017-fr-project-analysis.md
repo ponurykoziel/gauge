@@ -22,9 +22,9 @@
 - `LOW` — highest active priority is LOW
 - `NORMAL` — highest active priority is NORMAL
 - `HIGH` — highest active priority is HIGH
-- `INACTIVE` — nothing active, but parked (INACTIVE) issues remain
-- `DONE` — nothing active and nothing parked; all issues done
+- `DONE` — nothing active, but at least one issue is done
+- `INACTIVE` — nothing active and nothing done; only parked issues remain
 
-"Active" means `TODO` or `DOING`. `INACTIVE` issues are parked: they are excluded from priority bubbling entirely (a parked `HIGH` issue does not make a project `HIGH`), and their presence keeps a project out of `DONE`.
+"Active" means `TODO` or `DOING`. `INACTIVE` issues are parked: they are excluded from priority bubbling entirely (a parked `HIGH` issue does not make a project `HIGH`). `INACTIVE` is the least important resolved state — it ranks below `DONE` and never displaces it.
 
 Bubbled priority surfaces the most urgent thing anywhere in a project tree, enabling triage at any level of the hierarchy.

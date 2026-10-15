@@ -481,11 +481,11 @@ class ProjectAnalysisServiceTest {
         assertEquals(BubbledPriority.LOW, results.get("P0000001").bubbledPriority);
     }
 
-    // ---- 26: DONE + INACTIVE → INACTIVE (parked work means not finished) ----
+    // ---- 26: DONE beats INACTIVE (parked is the least important state) ----
 
     @Test
     @Transactional
-    void testDonePlusInactiveIsInactive() {
+    void testDoneBeatsInactive() {
         createProject("P0000001", "P", null);
         createIssue("I0000001", "P0000001", "Done", Priority.NORMAL, IssueStatus.DONE);
         createIssue("I0000002", "P0000001", "Parked", Priority.NORMAL, IssueStatus.INACTIVE);
@@ -494,7 +494,7 @@ class ProjectAnalysisServiceTest {
         ProjectAnalysisResult r = results.get("P0000001");
         assertEquals(1, r.issueDone);
         assertEquals(1, r.issueInactive);
-        assertEquals(BubbledPriority.INACTIVE, r.bubbledPriority);
+        assertEquals(BubbledPriority.DONE, r.bubbledPriority);
     }
 
     // ---- 27: all four statuses counted independently ----
